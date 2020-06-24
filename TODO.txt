@@ -2,3 +2,8 @@
 2. Nimrodel contract for maintaining list of rivulets.
 3. Implement Sponsoring module that burns a bit of WeiDai before injecting the Dai
 4. Quickbuy SCX for low gas SCX purchase. Charge more that average price on Behodler so that it can gradually increase its oomph
+'
+
+TODO for next time:
+Change stake to fractional withdrawal again
+add test with many users staking and unstaking

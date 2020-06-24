@@ -23,42 +23,50 @@ contract Rivulet is Ownable {
     ERC20Like public dai;
 
     mapping(address => uint256) public staked;
+    mapping(address => uint256) public tickets;
+    uint256 public totalTickets;
     mapping(address => uint256) public scxMultiple; //burning Scx gives an effective balance of 10x
     mapping(address => uint256) public damHeightAtJoin; //when calculating Dai, (dam-damHeightAtJoin)*SCX
     mapping(address => uint256) public ponds; // Dai accumulated per user
-    uint256 damHeight = ONE; // total growth as % since first deposit;
+    uint256 public damHeight = ONE; // total growth as % since first deposit;
 
-    uint256 public totalScarcityStaked;
-    uint256 public totalEffectiveStaked;
-    uint256 public maxSCX; //this acts as the denominator in adjusting the rate of flow
+    // uint256 public totalEffectiveStaked;
+    uint256 public maxTickets; //this acts as the denominator in adjusting the rate of flow
     uint256 public initialDai; //used to calculate aggregate flow
     uint256 public timeScale = 14 days;
     uint256 public burnMultiple = 10; //scxBurnt is staked at this multiple
     uint256 public ticketSize = 1000000 ether; // minimum SCX to stake;
     uint256 lastDrip; //following from MakerDAO's pot, the growth must be calculated before deposit and withdrawal can be invoked.
 
+    constructor() public {
+        lastDrip = now;
+    }
+
     function seed(
         address daiAddress,
         address scxAddress,
         uint256 time,
-        uint256 b
+        uint256 b,
+        uint256 m
     ) public onlyOwner {
-        scarcity = ScarcityLike(scxAddress);
         dai = ERC20Like(daiAddress);
-        timeScale = time;
+        scarcity = ScarcityLike(scxAddress);
+        timeScale = time == 0 ? timeScale : time;
         burnMultiple = b;
+        maxTickets = m;
     }
 
-    function setTicketSize(uint256 t) public onlyOwner {
+    function setTicketParameters(uint256 t, uint256 m) public onlyOwner {
         ticketSize = t;
+        maxTickets = m;
     }
 
     function setBurnMultiple(uint256 b) public onlyOwner {
         burnMultiple = b;
     }
 
+    //where Dai meets Nimrodel. Don't call directly if you want to sponsor
     function celebrant(uint256 value) external {
-        //where Dai meets Nimrodel. Don't call directly if you want to sponsor
         require(
             dai.transferFrom(msg.sender, address(this), value),
             "dai transfer to Rivulet failed"
@@ -69,127 +77,116 @@ contract Rivulet is Ownable {
         }
     }
 
+    function dripIfStale() public {
+        if (now != lastDrip) drip();
+    }
+
     function drip() public {
         uint256 rightNow = now;
-        if (totalScarcityStaked == 0) {
+        if (totalTickets == 0) {
             lastDrip = rightNow;
             return;
         }
         uint256 timeSpan = rightNow > lastDrip ? rightNow - lastDrip : lastDrip; //avoid miner attacks
-        uint256 aggregateDaiPerScxPerSecond = aggregateFlow().div(
-            totalScarcityStaked
-        );
-        uint256 linearGrowth = aggregateDaiPerScxPerSecond.mul(timeSpan);
-        uint256 maxHeight = dai.balanceOf(address(this)).mul(ONE).div(
-            totalEffectiveStaked
-        );
+        uint256 flow = aggregateFlow();
+        uint256 aggregateDaiPerTicketPerSecond = flow.div(totalTickets);
+        uint256 linearGrowth = aggregateDaiPerTicketPerSecond.mul(timeSpan);
+        uint256 maxHeight = dai.balanceOf(address(this)).div(totalTickets);
         damHeight = damHeight.add(linearGrowth);
         damHeight = damHeight < maxHeight ? damHeight : maxHeight;
-        lastDrip = rightNow;
+        lastDrip = now;
     }
 
-    modifier freshDrips() {
-        require(lastDrip == now, "call drip before adding or removing stake.");
-        _;
-    }
-
-    function stake(uint256 tickets, uint256 burnRatio) external freshDrips {
-        require(burnRatio <= 100, "ratio expressed as % between 1 and 100");
-        uint256 value = tickets * ticketSize;
-        if (burnRatio == 0) {
-            stake(value, msg.sender);
-        } else {
-            stake(value, burnRatio, msg.sender);
-        }
-    }
-
-    /**
-    decimal existingDaiBalance = ScxStaked[name] * (Chi - InitialChiOffset[name]);
-            ScxStaked[name] = ScxStaked[name] - SCX;
-            DaiBalances[name] += existingDaiBalance;
-            InitialChiOffset[name] = Chi;
-            SCX_total_stake -= SCX;
-     */
-
-    function drainPond () external freshDrips {
-        fillPond(msg.sender);
-        uint daiToSend = ponds[msg.sender];
-        ponds[msg.sender] = 0;
-        require(dai.transfer(msg.sender, daiToSend),"dai transfer failed");
-    }
-
-    function unstake(uint256 value) external freshDrips {
-        fillPond(msg.sender);
-        uint256 daiToSend = ponds[msg.sender]
-            .mul(ONE)
-            .mul(value)
-            .div(staked[msg.sender])
-            .div(ONE);
-
-        ponds[msg.sender] = ponds[msg.sender].sub(daiToSend);
-        staked[msg.sender] = staked[msg.sender].sub(value);
-        if (staked[msg.sender] == 0) scxMultiple[msg.sender] = 0;
-        require(dai.transfer(msg.sender, daiToSend),"dai transfer failed");
-    }
-
-    function fillPond(address sender)
-        private
-        returns (uint256 effectiveStaked)
-    {
-        effectiveStaked = scxMultiple[sender] * staked[sender];
-        ponds[sender] += effectiveStaked
-            .mul(damHeight - damHeightAtJoin[sender])
-            .div(ONE);
+    function fillPond(address sender) private {
+        ponds[sender] += tickets[sender].mul(
+            damHeight - damHeightAtJoin[sender]
+        );
         damHeightAtJoin[sender] = damHeight;
     }
 
-    function stake(uint256 value, address sender) private {
-        require(
-            scarcity.transferFrom(sender, address(this), value),
-            "transfer of SCX failed"
-        );
-        uint256 effectiveStaked = fillPond(sender);
-
-        staked[sender] = staked[sender] + value;
-        scxMultiple[sender] = (effectiveStaked + value) / staked[sender];
-        totalScarcityStaked = totalScarcityStaked.add(value);
-        totalEffectiveStaked = totalEffectiveStaked.add(value);
+    function drainPond() external {
+        dripIfStale();
+        fillPond(msg.sender);
+        uint256 daiToSend = ponds[msg.sender];
+        ponds[msg.sender] = 0;
+        require(dai.transfer(msg.sender, daiToSend), "dai transfer failed");
     }
 
-    function stake(
-        uint256 value,
-        uint256 burnRatio,
-        address sender
-    ) private {
-        //bigger rewards but more gassy
+    function stake(uint256 stakeValue, uint256 burnValue) external {
+        dripIfStale();
+        uint256 stakeTrunc = stakeValue.sub(stakeValue.mod(ticketSize));
+        uint256 burnTrunc = burnValue.sub(burnValue.mod(ticketSize));
+        require(stakeTrunc + burnTrunc > 0, "no tickets purchased");
         require(
-            scarcity.transferFrom(sender, address(this), value),
+            scarcity.transferFrom(
+                msg.sender,
+                address(this),
+                stakeTrunc + burnTrunc
+            ),
             "transfer of SCX failed"
         );
-        uint256 effectiveStaked = fillPond(sender);
-        uint256 notBurnt = ((100 - burnRatio) * value).div(100);
-        if (burnRatio > 0) {
-            scarcity.burn(burnRatio * value);
+        fillPond(msg.sender);
+        uint256 ticketsCreated = (stakeTrunc + (burnMultiple * burnTrunc)) /
+            ticketSize;
+        tickets[msg.sender] = tickets[msg.sender].add(ticketsCreated);
+        require(
+            (totalTickets = totalTickets + ticketsCreated) <= maxTickets ||
+                maxTickets == 0,
+            "rivulet has maxed out ticket sales."
+        );
+        staked[msg.sender] = staked[msg.sender].add(stakeTrunc);
+        if (burnTrunc > 0) {
+            scarcity.burn(burnTrunc);
         }
-        uint256 effectiveAddition = (burnMultiple * burnRatio * value).div(
-            100
-        ) + (100 - burnRatio) * value.div(100);
-        staked[sender] = staked[sender] + notBurnt;
-        scxMultiple[sender] =
-            (effectiveAddition + effectiveStaked) /
-            staked[sender];
-        totalScarcityStaked = totalScarcityStaked.add(value);
-        totalEffectiveStaked = totalEffectiveStaked.add(effectiveAddition);
+    }
+
+    function unstake(uint256 scx) external {
+        uint256 stakeToWithdraw = scx > staked[msg.sender]
+            ? staked[msg.sender]
+            : scx;
+        uint256 ticketsToUnstake = proportionMul( //possibly change
+            stakeToWithdraw,
+            staked[msg.sender],
+            tickets[msg.sender]
+        );
+        staked[msg.sender] = staked[msg.sender].sub(stakeToWithdraw);
+        scarcity.transfer(msg.sender, stakeToWithdraw);
+        if (tickets[msg.sender] == 0) {
+            return;
+        }
+        dripIfStale();
+        fillPond(msg.sender);
+
+        uint256 daiToSend = proportionMul(
+            ticketsToUnstake,
+            tickets[msg.sender],
+            ponds[msg.sender]
+        );
+        tickets[msg.sender] = tickets[msg.sender].sub(ticketsToUnstake);
+        totalTickets = totalTickets.sub(ticketsToUnstake);
+        ponds[msg.sender] = ponds[msg.sender].sub(daiToSend);
+        dai.transfer(msg.sender, daiToSend);
+    }
+
+    function proportionMul(
+        uint256 numerator,
+        uint256 denominator,
+        uint256 base
+    ) private pure returns (uint256) {
+        return (numerator.mul(ONE).div(denominator).mul(base)).div(ONE);
     }
 
     //do not allow max to be reached
     //Dai per second
+    // NB: 'ware the fixed point dragons
     function aggregateFlow() public view returns (uint256 flow) {
-        // NB, this rate is inflated by ONE for fixed point arithmetic
-        uint256 denominator = maxSCX;
-        uint256 numerator = ONE.mul(denominator.sub(totalScarcityStaked));
+        uint256 max = maxTickets == 0
+            ? scarcity.totalSupply() / ticketSize
+            : maxTickets;
+        uint256 denominator = max;
+        uint256 numerator = ONE.mul(denominator.sub(totalTickets));
         uint256 inflatedRatio = numerator.div(denominator);
-        uint256 duration = (timeScale.mul(inflatedRatio));
+        uint256 duration = (timeScale.mul(inflatedRatio)).div(ONE);
         flow = initialDai.div(duration);
     }
 }
