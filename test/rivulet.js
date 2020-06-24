@@ -342,7 +342,7 @@ contract('rivulet 4 stakers', accounts => {
 
     })
 })
-/*
+
 contract('rivulet 5 stakers', accounts => {
     var scarcityInstance, daiInstance, rivuletInstance, haldirInstance
     const primaryOptions = { from: accounts[0], gas: "0x6091b7" }
@@ -358,52 +358,27 @@ contract('rivulet 5 stakers', accounts => {
     })
 
     test("max tickets", async () => {
-        await rivuletInstance.setTicketParameters(10,10, primaryOptions)
+        await rivuletInstance.setTicketParameters(10, 10, primaryOptions)
         const initialDai = (await rivuletInstance.initialDai.call(primaryOptions)).toNumber()
         await daiInstance.approve(rivuletInstance.address, '10000000000000000000', primaryOptions)
         await rivuletInstance.celebrant("1000000000000000000", primaryOptions)
-        const scx = ticketSize.times(1000);
-        const burnt = scx.dividedBy(2)
-
-        await scarcityInstance.approve(rivuletInstance.address, scx.toString(), primaryOptions)
-        await scarcityInstance.mint(accounts[0], scx.plus(100), primaryOptions)
-        await scarcityInstance.approve(rivuletInstance.address, scx.plus(burnt).toString(), secondaryOptions)
-        await scarcityInstance.mint(accounts[1], scx.plus(burnt), primaryOptions)
-
-        await rivuletInstance.stake(scx.toString(), "0", primaryOptions)
-        await rivuletInstance.stake(scx.toString(), burnt.toString(), secondaryOptions)
-        const damHeightBefore = new bigNumber((await rivuletInstance.damHeight.call()).toString())
-
-        await time.advanceTimeAndBlock(10)
-        await rivuletInstance.drip()
-        const damHeightAfterGrowth = new bigNumber((await rivuletInstance.damHeight.call()).toString())
 
 
-        assert.isTrue(damHeightAfterGrowth.isGreaterThan(damHeightBefore))
+        await scarcityInstance.approve(rivuletInstance.address, "100000", primaryOptions)
+        await scarcityInstance.mint(accounts[0], "1000", primaryOptions)
+        await scarcityInstance.approve(rivuletInstance.address, "100000", secondaryOptions)
+        await scarcityInstance.mint(accounts[1], "10000", primaryOptions)
 
-        await rivuletInstance.unstake(scx.toString(), primaryOptions)
-        await rivuletInstance.unstake(scx.plus(burnt).toString(), secondaryOptions)
+        await rivuletInstance.stake("50", "0", primaryOptions)
+        await rivuletInstance.stake("50", "0", secondaryOptions)
 
-        const totalTickets = new bigNumber((await rivuletInstance.totalTickets.call()).toString())
 
-        assert.equal(totalTickets.toNumber(), 0)
-        await time.advanceTimeAndBlock(10)
-        await rivuletInstance.drip()
-        const damHeightAfterTotalWithdrawal = new bigNumber((await rivuletInstance.damHeight.call()).toString())
+        await expectThrow(rivuletInstance.stake("9", "0", secondaryOptions), "no tickets purchased");
 
-        assert.equal(damHeightAfterTotalWithdrawal.toString(), damHeightAfterGrowth.toString())
-
-        await scarcityInstance.approve(rivuletInstance.address, scx.toString(), primaryOptions)
-        await rivuletInstance.stake(scx.toString(), "0", primaryOptions)
-        await time.advanceTimeAndBlock(10)
-        await rivuletInstance.drip()
-        const damHeightAfterRestake = new bigNumber((await rivuletInstance.damHeight.call()).toString())
-        assert.isTrue(damHeightAfterRestake.isGreaterThan(damHeightAfterTotalWithdrawal))
-
+        await expectThrow(rivuletInstance.stake("10", "0", secondaryOptions), "rivulet has maxed out ticket sales.")
     })
 })
 
-*/
 
 
 //ticket size
