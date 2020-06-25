@@ -1,6 +1,7 @@
 const Rivulet = artifacts.require('Rivulet')
 const MockScarcity = artifacts.require("MockScarcity")
 const MockDai = artifacts.require("MockDai")
+const Celeborn = artifacts.require("Celeborn")
 
 const fs = require('fs')
 module.exports = async function (deployer, network, accounts) {
@@ -25,11 +26,16 @@ module.exports = async function (deployer, network, accounts) {
         scarcityAddress = '0xff1614C6B220b24D140e64684aAe39067A0f1CD0'
         daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F'
     }
+    await deployer.deploy(Celeborn)
+    const celebornInstance = await Celeborn.deployed()
     console.log(JSON.stringify({ scarcityAddress, daiAddress }))
     await deployer.deploy(Rivulet)
     const rivuletInstance = await Rivulet.deployed()
-    await rivuletInstance.seed(daiAddress, scarcityAddress, 0, 10, 0)
+    await rivuletInstance.seed(daiAddress, scarcityAddress,celebornInstance.address, 0, 10, 0)
     await rivuletInstance.setTicketParameters('1000', 0)
+
+  
+    await celebornInstance.seed(rivuletInstance.address, daiAddress)
 }
 
 const dependencyAddresses = () => {

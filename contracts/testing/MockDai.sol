@@ -6,6 +6,6 @@ contract MockDai is ERC20 {
         public
         ERC20(name, symbol)
     {
-        _mint(msg.sender, 100 ether);
+        _mint(msg.sender, 200 ether);
     }
 }

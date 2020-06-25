@@ -378,33 +378,3 @@ contract('rivulet 5 stakers', accounts => {
         await expectThrow(rivuletInstance.stake("10", "0", secondaryOptions), "rivulet has maxed out ticket sales.")
     })
 })
-
-
-
-//ticket size
-/*
-test("staking & unstaking with some burning", async () => {
-
-
-})
-
-
-test("unstaking all scx pauses growth", async () => {
-
-
-})
-
-test("staking above max tickets fails", async () => {
-
-
-})
-
-test("for maxTickets == 0, increasing SCX totalSupply increases tickets, decreasing SCX decreases tickets", async () => {
-
-
-})
-
-test("using up all dai gracefully pauses Rivulet", async () => {
-
-})
-*/

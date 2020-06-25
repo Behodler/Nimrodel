@@ -21,6 +21,7 @@ contract Rivulet is Ownable {
 
     ScarcityLike public scarcity;
     ERC20Like public dai;
+    address public celeborn;
 
     mapping(address => uint256) public staked;
     mapping(address => uint256) public tickets;
@@ -45,6 +46,7 @@ contract Rivulet is Ownable {
     function seed(
         address daiAddress,
         address scxAddress,
+        address c,
         uint256 time,
         uint256 b,
         uint256 m
@@ -54,6 +56,7 @@ contract Rivulet is Ownable {
         timeScale = time == 0 ? timeScale : time;
         burnMultiple = b;
         maxTickets = m;
+        celeborn = c;
     }
 
     function setTicketParameters(uint256 t, uint256 m) public onlyOwner {
@@ -67,8 +70,16 @@ contract Rivulet is Ownable {
 
     //where Dai meets Nimrodel. Don't call directly if you want to sponsor
     function celebrant(uint256 value) external {
+        celebrant(msg.sender, value);
+    }
+
+    function celebrant(address sender, uint256 value) public {
         require(
-            dai.transferFrom(msg.sender, address(this), value),
+            msg.sender == address(this) || msg.sender == celeborn,
+            "not accessible to public"
+        );
+        require(
+            dai.transferFrom(sender, address(this), value),
             "dai transfer to Rivulet failed"
         );
         uint256 newBalance = dai.balanceOf(address(this));

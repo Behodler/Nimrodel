@@ -3,7 +3,7 @@ pragma solidity ^0.6.2;
 
 abstract contract RivuletLike {
     function celebrant(uint256 value) external virtual;
-
+    function celebrant(address sender, uint256 value) external virtual;
     function drainPond() external virtual;
 
     function stake(uint256 stakeValue, uint256 burnValue) external virtual;
