@@ -25,9 +25,7 @@ contract Celeborn is Ownable {
     uint256 safetyDurationMultiplier = 2 hours;
     uint256 constant ONE = 1 ether;
 
-    sponsorshipData[] public gold;
-    sponsorshipData[] public silver;
-    sponsorshipData[] public bronze;
+    sponsorshipData[14] public sponsors;
 
     function sponsor(
         uint256 slot,
@@ -38,46 +36,33 @@ contract Celeborn is Ownable {
         bytes calldata message
     ) external {
         require(message.length <= 140, "max message length exceeded.");
+        require(
+            value >= bronzeThreshold,
+            "minimum sponsoship payment not reached."
+        );
+        require(slot < maxBronze + maxSilver + maxGold, "invalid slot number");
+        require(value >= silverThreshold || slot < maxBronze, "slot-value mismatch");
+        require(value >= goldThreshold || slot < maxBronze + maxSilver, "slot-value mismatch");
+
         sponsorshipData memory data;
         data.message = message;
-        data.time = now;
-        if (value >= goldThreshold) {
-            slot = 0;
-            data.companyName = company;
-            data.logoURL = logo;
-            data.siteURL = siteURL;
-            if (gold.length == 0) {
-                gold.push(data);
-            } else {
-                require(
-                    now - gold[0].time > safetyDurationMultiplier * value,
-                    "current gold sponsor can't be displaced yet."
-                );
-                gold[0] = data;
-            }
-        } else if (value >= silverThreshold) {
-            if (slot >= maxSilver - 1) slot = maxSilver - 1;
+        data.time = now; 
+        
+        if (value >= silverThreshold) {
             data.companyName = company;
             data.siteURL = siteURL;
-            if (silver.length <= slot) silver.push(data);
-            else {
-                require(
-                    now - silver[slot].time > safetyDurationMultiplier * value,
-                    "silver sponsor can't be displaced yet."
-                );
-                silver[slot] = data;
-            }
-        } else if (value >= bronzeThreshold) {
-            if (slot >= maxBronze - 1) slot = maxBronze - 1;
-            if (bronze.length <= slot) bronze.push(data);
-            else {
-                require(
-                    now - silver[slot].time > safetyDurationMultiplier * value,
-                    "bronze sponsor can't be displaced yet."
-                );
-                bronze[slot] = data;
-            }
         }
+        if (value >= goldThreshold) {
+            data.logoURL = logo;
+        }
+
+        require(
+            now - sponsors[slot].time >
+                safetyDurationMultiplier * (value / ONE),
+            "current sponsor can't be displaced yet."
+        );
+
+        sponsors[slot] = data;
         rivulet.celebrant(msg.sender, value);
     }
 
@@ -99,26 +84,26 @@ contract Celeborn is Ownable {
         safetyDurationMultiplier = m;
     }
 
-    function getSponsorshipData(
-        uint256 tier,
-        uint256 slot,
-        uint256 field
-    ) external view returns (bytes memory) {
-        sponsorshipData memory data = tier == 0
-            ? gold[slot]
-            : (tier == 1 ? silver[slot] : bronze[slot]);
+    function getSponsorshipData(uint256 slot, uint256 field)
+        external
+        view
+        returns (bytes memory)
+    {
+        if (slot >= maxGold + maxSilver + maxBronze) return "INVALID SLOT";
+        sponsorshipData memory data = sponsors[slot];
+
         bytes32 dataToConvert;
         if (field == 0) dataToConvert = data.companyName;
         else if (field == 1) dataToConvert = data.logoURL;
         else if (field == 2) dataToConvert = data.siteURL;
         else return data.message;
-        uint spacePadding =0;
+        uint256 spacePadding = 0;
         for (uint256 i = 0; i < 32; i++) {
-            spacePadding = dataToConvert[i]==0?spacePadding+1:0;      
+            spacePadding = dataToConvert[i] == 0 ? spacePadding + 1 : 0;
         }
-        spacePadding =spacePadding== 32?31:spacePadding;
-        bytes memory depaddedReturn = new bytes(32-spacePadding);
-        for(uint i =0;i<32-spacePadding;i++){
+        spacePadding = spacePadding == 32 ? 31 : spacePadding;
+        bytes memory depaddedReturn = new bytes(32 - spacePadding);
+        for (uint256 i = 0; i < 32 - spacePadding; i++) {
             depaddedReturn[i] = dataToConvert[i];
         }
         return depaddedReturn;
