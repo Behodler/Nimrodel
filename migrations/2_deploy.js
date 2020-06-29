@@ -22,6 +22,7 @@ module.exports = async function (deployer, network, accounts) {
         let mockDaiInstance = await MockDai.deployed()
         const tokens = dependencyAddresses()
         if (tokens.length > 0) {
+            console.log('picket up tokenlocation')
             scarcityAddress = tokens[0]
             daiAddress = tokens[1]
             weidaiAddress = tokens[2]
@@ -37,7 +38,7 @@ module.exports = async function (deployer, network, accounts) {
     }
     await deployer.deploy(Celeborn)
     const celebornInstance = await Celeborn.deployed()
-    console.log(JSON.stringify({ scarcityAddress, daiAddress }))
+    console.log(JSON.stringify({ scarcityAddress, daiAddress, weidaiAddress }))
     await deployer.deploy(Rivulet)
     const rivuletInstance = await Rivulet.deployed()
     await rivuletInstance.seed(daiAddress, scarcityAddress, celebornInstance.address, 0, 10, 0)
@@ -50,6 +51,16 @@ module.exports = async function (deployer, network, accounts) {
         behodlerAddressList.lachesis, behodlerAddressList.janus, behodlerAddressList.weth,
         behodlerAddressList.registry, daiAddress, weidaiAddress)
     await celebornInstance.seed(rivuletInstance.address, daiAddress)
+    let NimrodelAddresses = {}
+    NimrodelAddresses[network] =
+    {
+        Rivulet: rivuletInstance.address,
+        Celeborn: celebornInstance.address,
+        Miruvor: miruvorInstance.address
+    }
+
+
+    fs.writeFileSync('/home/justin/weidai ecosystem/nimrodelAddresses.json', JSON.stringify(NimrodelAddresses,null,4))
 }
 
 const dependencyAddresses = () => {
@@ -79,7 +90,9 @@ const getBehodlerDevList = () => {
         registry: '0x37b73a2c6f4381C48c892915E0eD21885aBF4bc3',
     }
     const behodlerABILocation = "/home/justin/weidai ecosystem/behodler/BehodlerABIAddressMapping.json"
-    abiJSON = JSON.parse(fs.readFile(behodlerABILocation).toString())['development']["list"]
+    abiJSON = JSON.parse(fs.readFileSync(behodlerABILocation).toString())
+        .filter(b => b.name == 'development')[0]["list"]
+
     let retrieve = retrieveFactory(abiJSON)
     behodlerAddressList.scx = retrieve('Scarcity')
     behodlerAddressList.behodler = retrieve('Behodler')
@@ -94,8 +107,8 @@ const getBehodlerDevList = () => {
 
 
 const retrieveFactory = (list) => (key) => {
-    for(let i =0;i<list.length;i++){
-        if(list[i].contract == key){
+    for (let i = 0; i < list.length; i++) {
+        if (list[i].contract == key) {
             return list[i].address
         }
     }
