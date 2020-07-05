@@ -34,10 +34,10 @@ contract Rivulet is Ownable {
     // uint256 public totalEffectiveStaked;
     uint256 public maxTickets; //this acts as the denominator in adjusting the rate of flow
     uint256 public initialDai; //used to calculate aggregate flow
-    uint256 public timeScale = 14 days;
+    uint256 public timeScale = 8 weeks;
     uint256 public burnMultiple = 10; //scxBurnt is staked at this multiple
     uint256 public ticketSize = 1000000 ether; // minimum SCX to stake;
-    uint256 lastDrip; //following from MakerDAO's pot, the growth must be calculated before deposit and withdrawal can be invoked.
+    uint256 public lastDrip; //following from MakerDAO's pot, the growth must be calculated before deposit and withdrawal can be invoked.
 
     constructor() public {
         lastDrip = now;

@@ -22,7 +22,7 @@ contract Celeborn is Ownable {
     uint256 public goldThreshold = 100 ether;
     uint256 public silverThreshold = 20 ether;
     uint256 public bronzeThreshold = 1 ether;
-    uint256 safetyDurationMultiplier = 2 hours;
+    uint256 public safetyDurationMultiplier = 2 hours;
     uint256 constant ONE = 1 ether;
 
     sponsorshipData[14] public sponsors;

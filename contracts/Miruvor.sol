@@ -103,7 +103,7 @@ contract Miruvor is Ownable {
         require(scarcity.transfer(sender, scx), "scarcity payout failed");
     }
 
-    function stopper() public payable {
+    function stopperEth() public payable {
         janus.ethToToken{value: msg.value}(address(scarcity), 0, 0);
         ERC20Like pToken = ERC20Like(
             pyroTokenRegistry.baseTokenMapping(address(weth))
